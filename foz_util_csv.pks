@@ -59,7 +59,7 @@ create or replace package foz_util_csv is
                    ,p_matriz_csv    out t_matriz_csv
                    ,p_mostrar_titulo in boolean default false);
 
-  -- Escrever arquivo CSV
+  -- Write CSV File
 /*
   Teste de escrita:
   declare
