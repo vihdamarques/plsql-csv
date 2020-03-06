@@ -59,7 +59,11 @@ create or replace package foz_util_csv is
                    ,p_matriz_csv    out t_matriz_csv
                    ,p_mostrar_titulo in boolean default false);
 
-  -- Write CSV File
+  procedure ler_csv(p_csv            in clob
+                   ,p_matriz_csv    out t_matriz_csv
+                   ,p_mostrar_titulo in boolean default false);
+
+  -- Escrever arquivo CSV
 /*
   Teste de escrita:
   declare
@@ -111,3 +115,4 @@ create or replace package foz_util_csv is
   procedure escrever_xls(p_matriz_csv  in t_matriz_csv
                         ,p_csv        out blob);
 end foz_util_csv;
+/

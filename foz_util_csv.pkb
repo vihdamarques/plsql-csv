@@ -121,6 +121,119 @@ create or replace package body foz_util_csv is
     apex_application.stop_apex_engine;
   end;
 
+  procedure ler_csv(p_csv            in clob
+                   ,p_matriz_csv    out t_matriz_csv
+                   ,p_mostrar_titulo in boolean default false) is
+    --
+    l_clob           clob;
+    l_char           char(1);
+    l_lookahead      char(1);
+    l_pos            number := 0;
+    l_token          varchar2(32767) := null;
+    l_token_complete boolean := false;
+    l_line_complete  boolean := false;
+    l_new_token      boolean := true;
+    l_enclosed       boolean := false;
+    --
+    l_last_col_line  boolean := false;
+    --
+    l_lineno         number := 1;
+    l_columnno       number := 1;
+    --
+    l_columns        t_array;
+  begin
+
+    l_clob := p_csv;
+
+    loop
+      -- increment position index
+      l_pos := l_pos + 1;
+
+      -- get next character from clob
+      l_char := dbms_lob.substr( l_clob, 1, l_pos );
+
+      -- exit when no more characters to process
+      exit when l_char is null or l_pos > dbms_lob.getLength( l_clob );
+
+      -- if first character of new token is optionally enclosed character
+      -- note that and skip it and get next character
+      if l_new_token and l_char = G_ENCLOSE then
+        l_enclosed := true;
+        l_pos := l_pos + 1;
+        l_char := dbms_lob.substr( l_clob, 1, l_pos );
+      end if;
+      l_new_token := false;
+
+      -- get look ahead character
+      l_lookahead := dbms_lob.substr( l_clob, 1, l_pos + 1 );
+
+      -- inspect character (and lookahead) to determine what to do
+      if l_char = G_ENCLOSE and l_enclosed then
+
+        if l_lookahead = G_ENCLOSE then
+          l_pos := l_pos + 1;
+          l_token := l_token || l_lookahead;
+        elsif l_lookahead = G_DELIM then
+          l_pos := l_pos + 1;
+          l_token_complete := true;
+        else
+          l_enclosed := false;
+        end if;
+
+      elsif l_char in ( G_CARRIAGE_RETURN, G_LINE_FEED ) and NOT l_enclosed then
+        l_token_complete := true;
+        l_line_complete := true;
+
+        if l_lookahead in ( G_CARRIAGE_RETURN, G_LINE_FEED ) then
+          l_pos := l_pos + 1;
+        end if;
+
+      elsif l_char = G_DELIM and not l_enclosed then
+        l_token_complete := true;
+
+        if l_pos = dbms_lob.getLength( l_clob ) then -- complete line even if last column is null
+          l_line_complete := true;
+          l_last_col_line := true;
+        end if;
+
+      elsif l_pos = dbms_lob.getLength( l_clob ) then
+        l_token          := l_token || l_char;
+        l_token_complete := true;
+        l_line_complete  := true;
+
+      else
+        l_token := l_token || l_char;
+      end if;
+
+      -- process a new token
+      if l_token_complete then
+        l_columns(l_columnno) := l_token;
+
+        l_columnno := l_columnno + 1;
+        l_token := null;
+        l_enclosed := false;
+        l_new_token := true;
+        l_token_complete := false;
+
+        if l_last_col_line then -- includes last column even if last column is null
+          l_columns(l_columnno) := null;
+        end if;
+      end if;
+
+      -- process end-of-line here
+      if l_line_complete then
+        if (l_lineno > 1 or p_mostrar_titulo) then
+          p_matriz_csv(l_lineno - case when p_mostrar_titulo then 0 else 1 end) := l_columns;
+        end if;
+
+        l_columns.delete;
+        l_lineno := l_lineno + 1;
+        l_columnno := 1;
+        l_line_complete := false;
+      end if;
+    end loop;
+  end ler_csv;
+
   procedure ler_csv(p_csv            in blob
                    ,p_matriz_csv    out t_matriz_csv
                    ,p_mostrar_titulo in boolean default false) is
@@ -190,6 +303,10 @@ create or replace package body foz_util_csv is
 
       elsif l_char = G_DELIM and not l_enclosed then
         l_token_complete := true;
+        
+        if l_pos = dbms_lob.getLength( l_clob ) then -- includes last line even if last column is null
+          l_line_complete := true;
+        end if;
 
       elsif l_pos = dbms_lob.getLength( l_clob ) then
         l_token := l_token || l_char;
@@ -209,6 +326,10 @@ create or replace package body foz_util_csv is
         l_enclosed := false;
         l_new_token := true;
         l_token_complete := false;
+        
+        if l_pos = dbms_lob.getLength( l_clob ) then -- includes last column even if last column is null
+          l_columns(l_columnno) := null;
+        end if;
       end if;
 
       -- process end-of-line here
@@ -256,7 +377,9 @@ create or replace package body foz_util_csv is
 
         l_column := l_column || G_DELIM;
         dbms_lob.writeappend(l_line, length(l_column), l_column);
+
       end loop;
+
       l_line := substr(l_line, 1, nvl(dbms_lob.getlength(l_line), 0) - 1);
       dbms_lob.append(l_file, l_line);
       dbms_lob.writeappend(l_file, length(G_CRLF), G_CRLF);
@@ -318,3 +441,4 @@ create or replace package body foz_util_csv is
   end escrever_xls;
 
 end foz_util_csv;
+/
