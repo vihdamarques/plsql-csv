@@ -43,65 +43,83 @@ create or replace package body foz_util_csv is
     dbms_lob.writeappend(p_clob, length(p_string), p_string);
   end;
 
-  function blob_to_clob(p_blob in blob) return clob is
-    v_clob         clob;
-    v_clob_offset  number := 1;
-    v_blob_offset  number := 1;
-    v_lang_context number := dbms_lob.default_lang_ctx;
-    v_warning      pls_integer;
-    v_pos          number := 1;
-    v_lob_len      number := nvl(dbms_lob.getlength(p_blob), 0);
-    v_buff         varchar2(16000);
+  function blob_to_clob(p_blob in blob,
+                        p_charset in varchar2 default 'WE8ISO8859P1') return clob is
+    l_clob         clob;
+    l_clob_offset  number := 1;
+    l_blob_offset  number := 1;
+    l_lang_context number := dbms_lob.default_lang_ctx;
+    l_warning      pls_integer;
+    --l_pos          number := 1;
+    --l_lob_len      number := nvl(dbms_lob.getlength(p_blob), 0);
+    --l_buff         varchar2(16000);
   begin
-    dbms_lob.createtemporary(v_clob, true);
-    dbms_lob.open(v_clob, dbms_lob.lob_readwrite);
+    dbms_lob.createtemporary(l_clob, true);
+    dbms_lob.open(l_clob, dbms_lob.lob_readwrite);
 
-    /*dbms_lob.converttoclob(v_clob
+    dbms_lob.converttoclob(l_clob
                           ,p_blob
                           ,dbms_lob.lobmaxsize
-                          ,v_clob_offset
-                          ,v_blob_offset
-                          ,nls_charset_id('WE8ISO8859P1') -- AL32UTF8 / dbms_lob.default_csid
-                          ,v_lang_context
-                          ,v_warning);*/
+                          ,l_clob_offset
+                          ,l_blob_offset
+                          ,nls_charset_id(p_charset) -- AL32UTF8 / WE8ISO8859P1 / dbms_lob.default_csid
+                          ,l_lang_context
+                          ,l_warning);
 
-    loop
-      v_buff := utl_raw.cast_to_varchar2(dbms_lob.substr(p_blob
+    /*loop
+      l_buff := utl_raw.cast_to_varchar2(dbms_lob.substr(p_blob
                                                         ,16000
-                                                        ,v_pos));
-      if length(v_buff) > 0 then
-        dbms_lob.writeappend(v_clob, length(v_buff), v_buff);
+                                                        ,l_pos));
+      if length(l_buff) > 0 then
+        dbms_lob.writeappend(l_clob, length(l_buff), l_buff);
       end if;
 
-      v_pos := v_pos + 16000;
-      exit when v_pos > v_lob_len;
-    end loop;
+      l_pos := l_pos + 16000;
+      exit when l_pos > l_lob_len;
+    end loop;*/
 
-    return v_clob; -- v_clob is OPEN here
+    return l_clob; -- l_clob is OPEN here
   end;
 
-  function clob_to_blob(p_clob in clob) return blob is
-    v_blob    blob;
-    v_pos     number := 1;
-    v_lob_len number := nvl(dbms_lob.getlength(p_clob), 0);
-    v_amount  number := 16000;
-    v_buff    raw(16000);
+  function clob_to_blob(p_clob in clob,
+                        p_charset in varchar2 default 'WE8ISO8859P1') return blob is
+    l_blob         blob;
+    l_clob_offset  number := 1;
+    l_blob_offset  number := 1;
+    l_lang_context number := dbms_lob.default_lang_ctx;
+    l_warning      pls_integer;
+    --l_pos     number := 1;
+    --l_lob_len number := nvl(dbms_lob.getlength(p_clob), 0);
+    --l_amount  number := 16000;
+    --l_buff    raw(16000);
   begin
-    dbms_lob.createtemporary(v_blob, true);
-    dbms_lob.open(v_blob, dbms_lob.lob_readwrite);
-    loop
-      v_buff := utl_raw.cast_to_raw(dbms_lob.substr(p_clob
-                                                   ,v_amount
-                                                   ,v_pos));
-      if utl_raw.length(v_buff) > 0 then
-        dbms_lob.writeappend(v_blob, utl_raw.length(v_buff), v_buff);
+    dbms_lob.createtemporary(l_blob, true);
+    dbms_lob.open(l_blob, dbms_lob.lob_readwrite);
+
+    dbms_lob.converttoblob (
+      dest_lob      => l_blob,
+      src_clob      => p_clob,
+      amount        => dbms_lob.lobmaxsize,
+      dest_offset   => l_blob_offset,
+      src_offset    => l_clob_offset, 
+      blob_csid     => nls_charset_id(p_charset), -- AL32UTF8 / WE8ISO8859P1 / dbms_lob.default_csid
+      lang_context  => l_lang_context,
+      warning       => l_warning
+    );
+
+    /*loop
+      l_buff := utl_raw.cast_to_raw(dbms_lob.substr(p_clob
+                                                   ,l_amount
+                                                   ,l_pos));
+      if utl_raw.length(l_buff) > 0 then
+        dbms_lob.writeappend(l_blob, utl_raw.length(l_buff), l_buff);
       end if;
 
-      v_pos := v_pos + v_amount;
-      exit when v_pos > v_lob_len;
-    end loop;
+      l_pos := l_pos + l_amount;
+      exit when l_pos > l_lob_len;
+    end loop;*/
 
-    return v_blob; -- v_blob is OPEN here
+    return l_blob; -- l_blob is OPEN here
   end;
 
   procedure download_blob(p_blob        in out blob
@@ -236,7 +254,8 @@ create or replace package body foz_util_csv is
 
   procedure ler_csv(p_csv            in blob
                    ,p_matriz_csv    out t_matriz_csv
-                   ,p_mostrar_titulo in boolean default false) is
+                   ,p_mostrar_titulo in boolean default false
+                   ,p_charset        in varchar2 default 'WE8ISO8859P1') is
     --
     l_clob           clob;
     l_blob           blob;
@@ -256,7 +275,7 @@ create or replace package body foz_util_csv is
   begin
 
     l_blob := p_csv;
-    l_clob := blob_to_clob( l_blob );
+    l_clob := blob_to_clob(l_blob, p_charset);
 
     loop
       -- increment position index
@@ -347,7 +366,8 @@ create or replace package body foz_util_csv is
   end ler_csv;
 
   procedure escrever_csv(p_matriz_csv  in t_matriz_csv
-                        ,p_csv        out blob) is
+                        ,p_csv        out blob
+                        ,p_charset     in varchar2 default 'WE8ISO8859P1') is
     l_column varchar2(32767);
     l_line   clob;
     l_file   clob;
@@ -385,15 +405,16 @@ create or replace package body foz_util_csv is
       dbms_lob.writeappend(l_file, length(G_CRLF), G_CRLF);
     end loop;
 
-    p_csv := clob_to_blob(l_file);
+    p_csv := clob_to_blob(l_file, p_charset);
     dbms_lob.close(l_line);
     dbms_lob.close(l_file);
     dbms_lob.freetemporary(l_line);
     dbms_lob.freetemporary(l_file);
-  end;
+  end escrever_csv;
 
   procedure escrever_xls(p_matriz_csv  in t_matriz_csv
-                        ,p_csv        out blob) is
+                        ,p_csv        out blob
+                        ,p_charset     in varchar2 default 'WE8ISO8859P1') is
     l_column varchar2(32767);
     l_line   clob;
     l_file   clob;
@@ -433,7 +454,7 @@ create or replace package body foz_util_csv is
     write_clob(l_file, '</ss:Worksheet>');
     write_clob(l_file, '</ss:Workbook>');
 
-    p_csv := clob_to_blob(l_file);
+    p_csv := clob_to_blob(l_file, p_charset);
     dbms_lob.close(l_line);
     dbms_lob.close(l_file);
     dbms_lob.freetemporary(l_line);

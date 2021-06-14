@@ -20,8 +20,10 @@ create or replace package foz_util_csv is
   function a2t(arr in a_matriz_csv) return t_matriz_csv;
 
   -- Utilitarios
-  function blob_to_clob(p_blob in blob) return clob;
-  function clob_to_blob(p_clob in clob) return blob;
+  function blob_to_clob(p_blob    in blob,
+                        p_charset in varchar2 default 'WE8ISO8859P1') return clob;
+  function clob_to_blob(p_clob    in clob,
+                        p_charset in varchar2 default 'WE8ISO8859P1') return blob;
   procedure download_blob(p_blob        in out blob
                          ,p_file_name   in varchar2
                          ,p_mime_type   in varchar2 default 'application/csv'
@@ -57,7 +59,8 @@ create or replace package foz_util_csv is
 */
   procedure ler_csv(p_csv            in blob
                    ,p_matriz_csv    out t_matriz_csv
-                   ,p_mostrar_titulo in boolean default false);
+                   ,p_mostrar_titulo in boolean default false
+                   ,p_charset        in varchar2 default 'WE8ISO8859P1');
 
   procedure ler_csv(p_csv            in clob
                    ,p_matriz_csv    out t_matriz_csv
@@ -110,9 +113,11 @@ create or replace package foz_util_csv is
   end;
 */
   procedure escrever_csv(p_matriz_csv  in t_matriz_csv
-                        ,p_csv        out blob);
+                        ,p_csv        out blob
+                        ,p_charset     in varchar2 default 'WE8ISO8859P1');
   -- XML Excel  *BETA*
   procedure escrever_xls(p_matriz_csv  in t_matriz_csv
-                        ,p_csv        out blob);
+                        ,p_csv        out blob
+                        ,p_charset     in varchar2 default 'WE8ISO8859P1');
 end foz_util_csv;
 /
